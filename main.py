@@ -1,12 +1,13 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Loader:
-    def __init__(self):
+    def __init__(self, filename = "2012_S1W2.csv"):
         """ This class loads raw data and slices it in ways so as to be passed to the 
             rest of the program.  """
-        self.dataframe = pd.DataFrame.from_csv("./data/2012_S1W2.csv")  # Change if data not locally available
+        self.dataframe = pd.DataFrame.from_csv("./data/" + filename)  # Change if data not locally available
     
     def get_linsolver_coef_raw_dataframe(self):
         """ Picks subset of data to be passed to LinSolver. """
@@ -19,6 +20,27 @@ class Loader:
 
         return dataframe_result
 
+    def day_index_dataframe(self):
+        """ Adds another column that indicates which day of measurements 
+            the data relates to.
+            
+            Performance of this function is not very important, because it
+            is only used once for utility purposes.
+        """
+
+        days_array = np.zeros((self.dataframe.size, 1), dtype=int)        
+
+        current_day = 1
+
+        for i in range(0, self.dataframe["h"].size-1):
+            if self.dataframe["h"].iloc[i+1] < self.dataframe["h"].iloc[i]:
+                current_day += 1
+                days_array[i] = current_day
+            else:
+                days_array[i] = current_day
+
+        #TODO Fix days indexing
+        print(days_array)
 
 class LinSolver:
 
@@ -29,7 +51,6 @@ class LinSolver:
 
     def parse_matrix_coef_from_data(self, dataframe):
         """ Calculates coefficients of linear equations from slice of original data.  """ 
-        arrayshape = (dataframe.index.size, 3)
         coefs_list = []  # List so that it can be dynamically extended. TODO implement more efficient data structure      
 
         """
@@ -72,17 +93,32 @@ class LinSolver:
 
         return np.linalg.lstsq(A, b, rcond)
 
-    #TODO Check scaling of data, reiterate to get correct answer
-    #TODO Scaling is wrong, along with z value which is 2x larger
+    #TODO Fix signs and z value, left alone for now to do errors
+    #TODO Extract uncertainties in positions from residual
+    
 
 def main():
-    l = Loader()
+    l = Loader("2012_all.csv")
     ls = LinSolver()
-
-    dataframe = l.get_linsolver_coef_raw_dataframe()
-    A = ls.parse_matrix_coef_from_data(dataframe)
-    b = ls.parse_delays_vector_from_data(dataframe)
-    print(ls.solve_linear_system(A, b))
-
+   
+    l.day_index_dataframe()
+    
 if __name__ == "__main__":
     main()
+
+    """ Tests
+    i_vals = []
+    residuals = []
+    for i in range(10,700):
+        dataframe = l.get_linsolver_coef_raw_dataframe()[:i]
+        A = ls.parse_matrix_coef_from_data(dataframe)
+        b = ls.parse_delays_vector_from_data(dataframe)
+        i_vals.append(i)
+        residuals.append(ls.solve_linear_system(A,b)[1][0])
+
+    plt.plot(i_vals, residuals)
+    plt.title("Residual vs data points used data[:x]")
+    plt.xlabel("number of data points")
+    plt.ylabel("residual")
+    plt.show()
+    """
