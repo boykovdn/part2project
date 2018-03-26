@@ -44,20 +44,18 @@ class LinSolver:
 
         as derived from the geometry of the problem.
         """
-
+        
         # The following lambda function returns [coef_x, coef_y, coef_z]
         add_coefs_to_local_array = lambda series : coefs_list.append(
-            [np.cos(series["el"]) * np.cos(series["az"]),
-             np.cos(series["el"]) * np.sin(series["az"]),
-             np.sin(series["el"])]
+            [np.cos(np.radians(series["el"])) * np.sin(np.radians(series["az"])),
+             np.cos(np.radians(series["el"])) * np.cos(np.radians(series["az"])),
+             np.sin(np.radians(series["el"]))]
             )
        
         dataframe.apply(add_coefs_to_local_array, axis=1)
 
         return np.array(coefs_list)
 
-    #TODO Write matrix inversion script, get some initial results
-    
     def parse_delays_vector_from_data(self, dataframe):
         """ Creates a vector of delay differences to be passed on
         to the solution routine, from the original data.  """
@@ -67,18 +65,20 @@ class LinSolver:
 
         return np.array(result_series)
 
-    def solve_linear_system(self, A, b):
+    def solve_linear_system(self, A, b, rcond=None):
         """ This function applies the numpy lstsq routine to the
             parsed data and returns a solution that minimises the
             square error """
 
-        return np.linalg.lstsq(A, b)
+        return np.linalg.lstsq(A, b, rcond)
+
+    #TODO Check scaling of data, reiterate to get correct answer
+    #TODO Scaling is wrong, along with z value which is 2x larger
 
 def main():
     l = Loader()
     ls = LinSolver()
 
-    print(ls.parse_delays_vector_from_data(l.get_linsolver_coef_raw_dataframe()))
     dataframe = l.get_linsolver_coef_raw_dataframe()
     A = ls.parse_matrix_coef_from_data(dataframe)
     b = ls.parse_delays_vector_from_data(dataframe)
