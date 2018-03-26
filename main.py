@@ -57,13 +57,6 @@ class LinSolver:
 
         return np.array(coefs_list)
 
-    def calculate_coef_x(self, series):
-        """ coef_x = cos(el)cos(az) """
-        return np.cos(series["el"]) * np.cos(series["az"])
-
-    def calculate_coef_y(self, series):
-        pass   
-
     #TODO Write matrix inversion script, get some initial results
     
 
