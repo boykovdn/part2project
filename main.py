@@ -29,7 +29,6 @@ class LinSolver:
 
     def parse_matrix_coef_from_data(self, dataframe):
         """ Calculates coefficients of linear equations from slice of original data.  """ 
-        #TODO Calculate indices
         arrayshape = (dataframe.index.size, 3)
         coefs_list = []  # List so that it can be dynamically extended. TODO implement more efficient data structure      
 
@@ -59,13 +58,31 @@ class LinSolver:
 
     #TODO Write matrix inversion script, get some initial results
     
+    def parse_delays_vector_from_data(self, dataframe):
+        """ Creates a vector of delay differences to be passed on
+        to the solution routine, from the original data.  """
 
+        result_series = dataframe["delay2"] - dataframe["delay1"]
+        result_series.reset_index(drop=True, inplace=True)
+
+        return np.array(result_series)
+
+    def solve_linear_system(self, A, b):
+        """ This function applies the numpy lstsq routine to the
+            parsed data and returns a solution that minimises the
+            square error """
+
+        return np.linalg.lstsq(A, b)
 
 def main():
     l = Loader()
     ls = LinSolver()
 
-    
+    print(ls.parse_delays_vector_from_data(l.get_linsolver_coef_raw_dataframe()))
+    dataframe = l.get_linsolver_coef_raw_dataframe()
+    A = ls.parse_matrix_coef_from_data(dataframe)
+    b = ls.parse_delays_vector_from_data(dataframe)
+    print(ls.solve_linear_system(A, b))
 
 if __name__ == "__main__":
     main()
