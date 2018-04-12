@@ -5,17 +5,17 @@ import matplotlib.pyplot as plt
 
 class Loader:
     def __init__(self, filename = "2012_S1W2.csv"):
-        """ This class loads raw data and slices it in ways so as to be passed to the 
+        """ This class loads raw data and slices/modifies it in ways so as to be passed to the 
             rest of the program.  """
         self.dataframe = pd.DataFrame.from_csv("./data/" + filename)  # Change if data not locally available
     
-    def get_linsolver_coef_raw_dataframe(self):
+    def get_linsolver_coef_raw_dataframe(self, dataframe):
         """ Picks subset of data to be passed to LinSolver. """
         dataframe_result = pd.DataFrame()
-        dataframe_result["az"] = self.dataframe["az"]
-        dataframe_result["el"] = self.dataframe["el"]
-        dataframe_result["delay1"] = self.dataframe["delay1"]
-        dataframe_result["delay2"] = self.dataframe["delay2"]
+        dataframe_result["az"] = dataframe["az"]
+        dataframe_result["el"] = dataframe["el"]
+        dataframe_result["delay1"] = dataframe["delay1"]
+        dataframe_result["delay2"] = dataframe["delay2"]
         dataframe_result.reset_index(drop=True, inplace=True)
 
         return dataframe_result
@@ -109,8 +109,12 @@ def main():
     ls = LinSolver()
 
     l.day_index_dataframe()
-    subset = l.dataframe.loc[l.dataframe["day_number"] == 145]
-    print(subset)
+    subset = l.dataframe.loc["D/S1E1P51B46"]
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
+    b = ls.parse_delays_vector_from_data(subset)
+    print(ls.solve_linear_system(A,b))
+
     
 if __name__ == "__main__":
     main()
@@ -133,8 +137,50 @@ if __name__ == "__main__":
     """
 
     """Test solving for a pair
-    df = l.get_linsolver_coef_raw_dataframe()
+    df = l.get_linsolver_coef_raw_dataframe(l.dataframe)  #TODO Test again for sure
     A = ls.parse_matrix_coef_from_data(df)
     b = ls.parse_delays_vector_from_data(df)
     """ 
 
+    """ Test show different POP settings can be fitted with same A
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+
+    l.day_index_dataframe()
+    subset = l.dataframe.loc["D/S1W2P15B21"]
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
+    b = ls.parse_delays_vector_from_data(subset)
+    print(ls.solve_linear_system(A,b))
+
+    subset = l.dataframe.loc["D/S1W2P45B13"]
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
+    b = ls.parse_delays_vector_from_data(subset)
+    print(ls.solve_linear_system(A,b))
+    """
+
+    """ Test 1: show different POP settings for S1W2
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+
+    l.day_index_dataframe()
+    subset = l.dataframe.loc["D/S1W2P15B21"]
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
+    b = ls.parse_delays_vector_from_data(subset)
+    print(ls.solve_linear_system(A,b))
+
+    subset = l.dataframe.loc["D/S1W2P45B13"]
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
+    b = ls.parse_delays_vector_from_data(subset)
+    print(ls.solve_linear_system(A,b))
+
+    subset = l.dataframe.loc["D/S1W2P15B32"]
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
+    b = ls.parse_delays_vector_from_data(subset)
+    print(ls.solve_linear_system(A,b))
+    print(subset)
+    """
