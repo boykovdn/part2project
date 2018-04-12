@@ -28,19 +28,21 @@ class Loader:
             is only used once for utility purposes.
         """
 
-        days_array = np.zeros((self.dataframe.size, 1), dtype=int)        
+        #days_array = np.zeros((self.dataframe.size, 1), dtype=int)        
+        days_array = [0]*self.dataframe["h"].size
 
-        current_day = 1
+        current_day = 0
 
-        for i in range(0, self.dataframe["h"].size-1):
+        for i in range(0, self.dataframe["h"].size - 1):
             if self.dataframe["h"].iloc[i+1] < self.dataframe["h"].iloc[i]:
-                current_day += 1
                 days_array[i] = current_day
+                current_day += 1
             else:
                 days_array[i] = current_day
 
-        #TODO Fix days indexing
-        print(days_array)
+        days_array[-1] = days_array[-2]
+
+        self.dataframe["day_number"] = days_array
 
 class LinSolver:
 
@@ -103,9 +105,12 @@ class LinSolver:
     
 
 def main():
-    l = Loader("2012_S1W2.csv")
+    l = Loader("2012_all.csv")
     ls = LinSolver()
 
+    l.day_index_dataframe()
+    subset = l.dataframe.loc[l.dataframe["day_number"] == 145]
+    print(subset)
     
 if __name__ == "__main__":
     main()
