@@ -50,7 +50,7 @@ class LinSolver:
         pass
 
     def parse_matrix_coef_from_data(self, dataframe):
-        """ Calculates coefficients of linear equations from slice of original data.  """ 
+        """ Calculates the coefficients matrix of linear equations from slice of original data.  """ 
         coefs_list = []  # List so that it can be dynamically extended. TODO implement more efficient data structure      
 
         """
@@ -61,16 +61,21 @@ class LinSolver:
         
         I implement the formula:
 
-            cos(el)cos(az)*x + cos(el)sin(az)*y + sin(el)*z = d2 - d1
+            cos(el)cos(az)*x + cos(el)sin(az)*y + sin(el)*z + A = d2 - d1
 
         as derived from the geometry of the problem.
+
+        A is an unknown constant offset in the delays, as discussed in the
+        manual. I fit for it as well, giving it a constant coefficient of 1
+        for every data point.
         """
         
-        # The following lambda function returns [coef_x, coef_y, coef_z]
+        # The following lambda function returns [coef_x, coef_y, coef_z, 1]
         add_coefs_to_local_array = lambda series : coefs_list.append(
             [np.cos(np.radians(series["el"])) * np.sin(np.radians(series["az"])),
              np.cos(np.radians(series["el"])) * np.cos(np.radians(series["az"])),
-             np.sin(np.radians(series["el"]))]
+             np.sin(np.radians(series["el"])),
+             1]
             )
        
         dataframe.apply(add_coefs_to_local_array, axis=1)
@@ -93,15 +98,14 @@ class LinSolver:
 
         return np.linalg.lstsq(A, b, rcond)
 
-    #TODO Fix signs and z value, left alone for now to do errors
+    #TODO x-y signs?
     #TODO Extract uncertainties in positions from residual
     
 
 def main():
-    l = Loader("2012_all.csv")
+    l = Loader("2012_S1W2.csv")
     ls = LinSolver()
-   
-    l.day_index_dataframe()
+
     
 if __name__ == "__main__":
     main()
@@ -122,3 +126,10 @@ if __name__ == "__main__":
     plt.ylabel("residual")
     plt.show()
     """
+
+    """Test solving for a pair
+    df = l.get_linsolver_coef_raw_dataframe()
+    A = ls.parse_matrix_coef_from_data(df)
+    b = ls.parse_delays_vector_from_data(df)
+    """ 
+
