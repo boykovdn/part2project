@@ -8,6 +8,7 @@ class Loader:
         """ This class loads raw data and slices/modifies it in ways so as to be passed to the 
             rest of the program.  """
         self.dataframe = pd.DataFrame.from_csv("./data/" + filename)  # Change if data not locally available
+        self.day_index_dataframe()  # Add the day index on loading
     
     def get_linsolver_coef_raw_dataframe(self, dataframe):
         """ Picks subset of data to be passed to LinSolver. """
@@ -43,6 +44,28 @@ class Loader:
         days_array[-1] = days_array[-2]
 
         self.dataframe["day_number"] = days_array
+
+    
+    def get_telescope_pop_pairs(self, dataframe):
+        """ INPUT: A dataframe indexed by telescope-pop identifiers
+            OUTPUT: A list of the unique telescope-pop identifiers
+
+            Output from this function is used for grouping the data 
+            into clusters that have the same constant offset in delay
+            measurements. 
+
+            Not enhanced for performance because only serves a utility
+            purpose.
+        """
+        
+        ids = []
+
+        for name in dataframe.index:
+            if name not in ids:
+                ids.append(name)
+
+        return ids
+
 
 class LinSolver:
 
@@ -100,7 +123,6 @@ class LinSolver:
 
         return np.linalg.lstsq(A, b, rcond)
 
-    #TODO x-y signs?
     #TODO Extract uncertainties in positions from residual
     
 
@@ -108,14 +130,31 @@ def main():
     l = Loader("2012_all.csv")
     ls = LinSolver()
 
-    l.day_index_dataframe()
-    subset = l.dataframe.loc["D/S1E1P51B46"]
+    pairs = l.get_telescope_pop_pairs(l.dataframe)
 
-    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset))
-    b = ls.parse_delays_vector_from_data(subset)
-    print(ls.solve_linear_system(A,b))
+    subsets = []
+    for pair in pairs:
+        subsets.append(l.dataframe.loc[[pair]])
 
-    
+    xs = []
+    ys = []
+    zs = []
+    const = []
+    res = []
+    for s in subsets:
+        A = ls.parse_matrix_coef_from_data(s)
+        b = ls.parse_delays_vector_from_data(s)
+        solution = ls.solve_linear_system(A,b)
+        xs.append(solution[0][0])
+        ys.append(solution[0][1])
+        zs.append(solution[0][2])
+        const.append(solution[0][3])
+        res.append(solution[1])
+
+    results = pd.DataFrame({"pair": pairs,"x": xs,"y": ys,"z": zs,"offset": const,"residue": res})
+
+#    print(results.loc[results["pair"].str.contains("D/S1S2")])
+
 if __name__ == "__main__":
     main()
 
@@ -184,3 +223,40 @@ if __name__ == "__main__":
     print(ls.solve_linear_system(A,b))
     print(subset)
     """
+
+    """Test2
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+
+    l.day_index_dataframe()
+    df = l.dataframe
+    subset_all = df.loc["D/W1W2P25B31"]
+
+    subset_day34 = subset_all.loc[subset_all["day_number"] == 34]
+    subset_day144 = subset_all.loc[subset_all["day_number"] == 144]
+    subset_day143 = subset_all.loc[subset_all["day_number"] == 143]
+
+    print(subset_all.size)
+    print(subset_day34.size)
+    print(subset_day144.size)
+    print(subset_day143.size)
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset_all))
+    b = ls.parse_delays_vector_from_data(subset_all)
+    print(ls.solve_linear_system(A,b))
+    
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset_day34))
+    b = ls.parse_delays_vector_from_data(subset_day34)
+    print(ls.solve_linear_system(A,b))
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset_day144))
+    b = ls.parse_delays_vector_from_data(subset_day144)
+    print(ls.solve_linear_system(A,b))
+
+    A = ls.parse_matrix_coef_from_data(l.get_linsolver_coef_raw_dataframe(subset_day143))
+    b = ls.parse_delays_vector_from_data(subset_day143)
+    print(ls.solve_linear_system(A,b))
+
+
+    """
+
