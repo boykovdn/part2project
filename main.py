@@ -124,36 +124,85 @@ class LinSolver:
         return np.linalg.lstsq(A, b, rcond)
 
     #TODO Extract uncertainties in positions from residual
+
+
+class Routines:
+    """
+    Wrapper class for the numerical routines and results.
+    """
+
+    def get_subset_constant_offset(self):
+        """
+        Routine for grouping the raw data into subsets of
+        constant delay offset
+    
+        Data has to be grouped once into subsets of same
+        telescope-telescope and POP configuration pairs,
+        and then these subsets are split into different
+        data for different days. This ensures that the
+        regression analysis is fitting data that corres-
+        ponds to costant offsets as POP delay varies on day.
+        """
+        #TODO Optimise? Change two for loops to a single one
+        l = Loader("2012_all.csv")
+        ls = LinSolver()
+    
+        pairs = l.get_telescope_pop_pairs(l.dataframe)
+    
+        subsets = []
+        for pair in pairs:
+            subsets.append(l.dataframe.loc[[pair]])
+    
+        subsubsets = []
+        for subset in subsets:
+            unique_days = []
+            for day in subset["day_number"]:
+                if day not in unique_days:
+                    unique_days.append(day)
+            for day in unique_days: 
+                subsubsets.append(subset.loc[subset["day_number"] == day])
+    
+        return subsubsets
+    
+    def solution_routine(self, subsets):
+        l = Loader("2012_all.csv")
+        ls = LinSolver()
+    
+        xs = []
+        ys = []
+        zs = []
+        const = []
+        res = []
+        pairs = []
+        data_number = []
+        for s in subsets:
+            pairs.append((s.index)[0][2:-6])
+            A = ls.parse_matrix_coef_from_data(s)
+            b = ls.parse_delays_vector_from_data(s)
+            solution = ls.solve_linear_system(A,b)
+            xs.append(solution[0][0])
+            ys.append(solution[0][1])
+            zs.append(solution[0][2])
+            const.append(solution[0][3])
+            res.append(solution[1])
+            data_number.append(s.index.size)
+    
+        results = pd.DataFrame({"pair": pairs,"x": xs,"y": ys,"z": zs,"offset": const,"residue": res, "data_number": data_number})
+    
+        results = results[["pair","x","y","z","offset","residue","data_number"]]
+        results["baseline"] = np.sqrt(np.power(results["x"],2) + np.power(results["y"],2) + np.power(results["z"],2))
+    
+        return results
     
 
 def main():
-    l = Loader("2012_all.csv")
-    ls = LinSolver()
+    
+    r = Routines()    
 
-    pairs = l.get_telescope_pop_pairs(l.dataframe)
-
-    subsets = []
-    for pair in pairs:
-        subsets.append(l.dataframe.loc[[pair]])
-
-    xs = []
-    ys = []
-    zs = []
-    const = []
-    res = []
-    for s in subsets:
-        A = ls.parse_matrix_coef_from_data(s)
-        b = ls.parse_delays_vector_from_data(s)
-        solution = ls.solve_linear_system(A,b)
-        xs.append(solution[0][0])
-        ys.append(solution[0][1])
-        zs.append(solution[0][2])
-        const.append(solution[0][3])
-        res.append(solution[1])
-
-    results = pd.DataFrame({"pair": pairs,"x": xs,"y": ys,"z": zs,"offset": const,"residue": res})
-
-#    print(results.loc[results["pair"].str.contains("D/S1S2")])
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+    results_s2s1 = results.loc[results["pair"] == "S1S2"]
+    print(results_s2s1.loc[results_s2s1["data_number"] >= 4])
 
 if __name__ == "__main__":
     main()
