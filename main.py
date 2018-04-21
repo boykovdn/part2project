@@ -66,6 +66,35 @@ class Loader:
 
         return ids
 
+    def get_telescope_pairs(self, dataframe):
+        """This function extracts the unique telescope pairs
+        """
+        
+        pairs = []
+    
+        for identifier in dataframe.index:
+            pair = identifier[2:-6]
+            if pair not in pairs: 
+                pairs.append(pair) 
+
+        return pairs
+
+
+    def save_persistent_data(self, dataframe):
+        """
+        This function is used once to save central
+        results that persist between subsequent tests.
+        """
+
+        dataframe.to_csv(path_or_buf = "results.csv", index = False)
+
+    def load_persistent_data(self):
+        """
+        This supporting function loads locally saved
+        processed data to speed up subsequent processing.
+        """
+
+        return pd.read_csv("results.csv")
 
 class LinSolver:
 
@@ -194,15 +223,91 @@ class Routines:
     
         return results
     
+    def get_coordinates(self, dataframe):
+        """
+        INPUT: Dataframe of solutions for different
+        constant delays offsets, but a single telescope
+        pair
+
+        OUTPUT: A single solution for the telescope pair
+        """        
+
+        #Exclude underdefined solutions (with less than 4 datapoints)
+        dataframe_refined = dataframe.drop(dataframe.loc[dataframe["data_number"] < 4].index)
+        
+        pair = "underconstrained"
+        x = 0
+        y = 0
+        z = 0
+
+        if dataframe_refined.index.size == 0:
+            pass
+        else:
+            pair = dataframe_refined["pair"].iloc[0]
+            x = np.average(dataframe_refined["x"])
+            y = np.average(dataframe_refined["y"])
+            z = np.average(dataframe_refined["z"])
+
+        return [pair,x,y,z]
+
+    def remove_outliers(self, dataframe):
+        """
+        INPUT: Dataframe of pair,x,y,z values
+        
+        OUTPUT: Dataframe of pair,x,y,z values with
+        outliers in x,y,z removed
+        """
+
+        current = dataframe["x"].iloc[0]
+        flagged_indices = []
+        for i in range(0, dataframe["x"].size):
+            if current - dataframe["x"].iloc[i] > 1:
+                flagged_indices.append(dataframe.index[i])
+
+        dataframe.drop(labels=flagged_indices, inplace=True) 
+        
+        current = dataframe["y"].iloc[0]
+        flagged_indices = []
+        for i in range(0, dataframe["y"].size):
+            if current - dataframe["y"].iloc[i] > 1:
+                flagged_indices.append(dataframe.index[i])
+
+        dataframe.drop(labels=flagged_indices, inplace=True) 
+        
+        current = dataframe["z"].iloc[0]
+        flagged_indices = []
+        for i in range(0, dataframe["z"].size):
+            if current - dataframe["z"].iloc[i] > 1:
+                flagged_indices.append(dataframe.index[i])
+
+        dataframe.drop(labels=flagged_indices, inplace=True) 
+        
+        return dataframe
+
+
 
 def main():
     
     r = Routines()    
+    l = Loader("2012_all.csv")
 
-    subsets = r.get_subset_constant_offset()
-    results = r.solution_routine(subsets)
-    results_s2s1 = results.loc[results["pair"] == "S1S2"]
-    print(results_s2s1.loc[results_s2s1["data_number"] >= 4])
+    pairs = l.get_telescope_pairs(l.dataframe)
+
+    #subsets = r.get_subset_constant_offset()
+    #results = r.solution_routine(subsets)
+
+    results = l.load_persistent_data()
+    #l.save_persistent_data(results)  # Saves time
+    print(results)
+
+    for pair in pairs:
+        temp_dataframe = results.loc[results["pair"] == pair]
+        temp_dataframe = r.remove_outliers(temp_dataframe)
+        
+        print(r.get_coordinates(temp_dataframe))
+
+
+     
 
 if __name__ == "__main__":
     main()
@@ -307,5 +412,13 @@ if __name__ == "__main__":
     print(ls.solve_linear_system(A,b))
 
 
+    """
+    """Test3
+    r = Routines()    
+
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+    results_s2s1 = results.loc[results["pair"] == "S1S2"]
+    print(results_s2s1.loc[results_s2s1["data_number"] >= 4])
     """
 
