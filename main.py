@@ -233,22 +233,29 @@ class Routines:
         """        
 
         #Exclude underdefined solutions (with less than 4 datapoints)
-        dataframe_refined = dataframe.drop(dataframe.loc[dataframe["data_number"] < 4].index)
+        dataframe = dataframe.drop(dataframe.loc[dataframe["data_number"] < 4].index)
         
         pair = "underconstrained"
         x = 0
         y = 0
         z = 0
 
-        if dataframe_refined.index.size == 0:
+        x_std = 0
+        y_std = 0
+        z_std = 0
+
+        if dataframe.index.size == 0:
             pass
         else:
-            pair = dataframe_refined["pair"].iloc[0]
-            x = np.average(dataframe_refined["x"])
-            y = np.average(dataframe_refined["y"])
-            z = np.average(dataframe_refined["z"])
+            pair = dataframe["pair"].iloc[0]
+            x = np.average(dataframe["x"])
+            y = np.average(dataframe["y"])
+            z = np.average(dataframe["z"])
+            x_std = np.std(dataframe["x"])
+            y_std = np.std(dataframe["y"])
+            z_std = np.std(dataframe["z"])
 
-        return [pair,x,y,z]
+        return [pair,x,y,z,x_std,y_std,z_std]
 
     def remove_outliers(self, dataframe):
         """
@@ -285,6 +292,59 @@ class Routines:
         return dataframe
 
 
+    def remove_outliers_coord(self, dataframe, coordinate_name):
+        """
+        INPUT: dataframe of pair, x, y, z values; "x", "y", or "z"
+        OUTPUT: dataframe with outliers in this particular coordinate
+        removed
+
+        If the dataframe is empty, return it.
+        """
+
+        if(dataframe.index.size == 0):
+            print("returned empty dataframe..")
+            return dataframe
+
+        else:
+            bins = np.arange(-330,330)       
+     
+            hist, hist_edges = np.histogram(dataframe[coordinate_name], bins=bins)
+            value_lower = hist_edges[np.argmax(hist)]
+            subset = dataframe.loc[dataframe[coordinate_name] > value_lower]
+            subset = subset.loc[subset[coordinate_name] < (value_lower + 1)]
+    
+            average = np.average(subset[coordinate_name])
+            stdev = np.std(subset[coordinate_name])
+            
+            subset = subset.loc[subset[coordinate_name] > (average - 3 * stdev)]
+            subset = subset.loc[subset[coordinate_name] < (average + 3 * stdev)]
+       
+            return subset
+
+
+
+    def remove_outliers_1(self, dataframe):
+        """
+        INPUT: Dataframe of pair, x, y, z values
+        OUTPUT: Dataframe of pair,x,y,z, values and
+        outliers in x,y,z removed.
+
+        This is a different implementation of remove_outliers. 
+
+        Here, a histogram is used to detect in what range the 
+        answer lies. In order to avoid crossover between bins 
+        in cases where the value is close to the bin edge, the
+        algorithm computes the average value of the bin and
+        runs through the entire dataset, thresholding the values
+        to only those that lie within +- 1 of this value, which
+        is much higher than the sigma of the value distribution.
+        """
+
+        for coord in ["x", "y", "z"]:
+            dataframe = self.remove_outliers_coord(dataframe, coord)
+
+        return dataframe
+
 
 def main():
     
@@ -297,16 +357,12 @@ def main():
     #results = r.solution_routine(subsets)
 
     results = l.load_persistent_data()
-    #l.save_persistent_data(results)  # Saves time
-    print(results)
+    #l.save_persistent_data(results)  # Saves time     
 
     for pair in pairs:
-        temp_dataframe = results.loc[results["pair"] == pair]
-        temp_dataframe = r.remove_outliers(temp_dataframe)
-        
-        print(r.get_coordinates(temp_dataframe))
-
-
+        pair_dataframe = results.loc[results["pair"] == pair]
+        pair_dataframe = r.remove_outliers_1(pair_dataframe)
+        print(r.get_coordinates(pair_dataframe))
      
 
 if __name__ == "__main__":
