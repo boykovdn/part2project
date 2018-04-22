@@ -362,15 +362,52 @@ class Routines:
         return dataframe
 
 
+    def solution_routine_s1w2(self, dataframe):
+        l = Loader()
+        ls = LinSolver()
+    
+        xs = []
+        ys = []
+        zs = []
+        res = []
+        day_number = []
+        data_number = []
+
+        for day in range(dataframe["day_number"].iloc[dataframe.index.size - 1]):
+            s = dataframe.loc[dataframe["day_number"] == day]
+            A = ls.parse_matrix_coef_from_data(s)
+            b = ls.parse_delays_vector_from_data(s)
+            solution = ls.solve_linear_system(A,b)
+            xs.append(solution[0][0])
+            ys.append(solution[0][1])
+            zs.append(solution[0][2])
+            res.append(solution[1])
+            day_number.append(day)
+            data_number.append(s.index.size)
+    
+        results = pd.DataFrame({"x": xs,"y": ys,"z": zs, "residue": res, "data_number": data_number, "day_number": day_number}) 
+    
+        results = results[["x","y","z","day_number", "residue","data_number"]]
+        results["baseline"] = np.sqrt(np.power(results["x"],2) + np.power(results["y"],2) + np.power(results["z"],2))
+    
+        return results
+ 
+
 def main():
-    l = Loader()
+    l = Loader("2012_all.csv")
     ls = LinSolver()
     r = Routines()
 
-    l.dataframe.reset_index(inplace=True)
-    l.save_persistent_data(l.dataframe)
+    pairs = l.get_telescope_pairs(l.dataframe)    
 
-    print(l.dataframe)   
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+
+    results_e1w1 = results.loc[results["pair"] == "E1W1"]
+    results_e1w1 = r.remove_outliers_1(results_e1w1)
+    print(results_e1w1)   
+
+    
 
 if __name__ == "__main__":
     main()
@@ -518,4 +555,40 @@ if __name__ == "__main__":
         dataframe = results.loc[results["pair"] == pair]  # Select data
         dataframe = r.remove_outliers_1(dataframe)
         print(r.get_coordinates(dataframe))
+    """
+    """ Test outliers in S1W2
+    l = Loader()
+    ls = LinSolver()
+
+    l.dataframe.reset_index(inplace=True)
+#    l.dataframe.to_csv(path_or_buf = "residual.csv"
+
+    outlier_day7 = l.dataframe.loc[l.dataframe["day_number"] == 7]
+    outlier_day17 = l.dataframe.loc[l.dataframe["day_number"] == 17]
+    
+    l.dataframe.drop(labels = outlier_day7.index, inplace=True)
+    l.dataframe.drop(labels = outlier_day17.index, inplace=True)
+
+#    i_vals = []
+#    residuals = []
+#    for i in range(10,700):
+#        dataframe = l.get_linsolver_coef_raw_dataframe(l.dataframe)[:i]
+#        A = ls.parse_matrix_coef_from_data(dataframe)
+#        b = ls.parse_delays_vector_from_data(dataframe)
+#        i_vals.append(i)
+#        residuals.append(ls.solve_linear_system(A,b)[1][0])
+    
+    A = ls.parse_matrix_coef_from_data(outlier_day7)
+    b = ls.parse_delays_vector_from_data(outlier_day7)
+    print(ls.solve_linear_system(A,b))
+
+    A = ls.parse_matrix_coef_from_data(outlier_day17)
+    b = ls.parse_delays_vector_from_data(outlier_day17)
+    print(ls.solve_linear_system(A,b))
+
+#    plt.plot(i_vals, residuals)
+#    plt.title("Residual vs data points used data[:x]")
+#    plt.xlabel("number of data points")
+#    plt.ylabel("residual")
+#    plt.show()
     """
