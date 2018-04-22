@@ -192,7 +192,17 @@ class Routines:
                 subsubsets.append(subset.loc[subset["day_number"] == day])
     
         return subsubsets
-    
+
+    def filter_underconstrained(self, subsets):
+                
+        results = []
+        for s in subsets:
+            if s.index.size > 4:
+                results.append(s)
+
+        return results 
+
+
     def solution_routine(self, subsets):
         l = Loader("2012_all.csv")
         ls = LinSolver()
@@ -204,6 +214,9 @@ class Routines:
         res = []
         pairs = []
         data_number = []
+
+        subsets = self.filter_underconstrained(subsets)
+
         for s in subsets:
             pairs.append((s.index)[0][2:-6])
             A = ls.parse_matrix_coef_from_data(s)
@@ -244,6 +257,8 @@ class Routines:
         y_std = 0
         z_std = 0
 
+        data_number = 0
+
         if dataframe.index.size == 0:
             pass
         else:
@@ -254,8 +269,9 @@ class Routines:
             x_std = np.std(dataframe["x"])
             y_std = np.std(dataframe["y"])
             z_std = np.std(dataframe["z"])
+            data_number = dataframe.index.size
 
-        return [pair,x,y,z,x_std,y_std,z_std]
+        return [pair,x,y,z,x_std,y_std,z_std,data_number]
 
     def remove_outliers(self, dataframe):
         """
@@ -347,32 +363,26 @@ class Routines:
 
 
 def main():
-    
-    r = Routines()    
-    l = Loader("2012_all.csv")
+    l = Loader()
+    ls = LinSolver()
+    r = Routines()
 
-    pairs = l.get_telescope_pairs(l.dataframe)
+    l.dataframe.reset_index(inplace=True)
+    l.save_persistent_data(l.dataframe)
 
-    #subsets = r.get_subset_constant_offset()
-    #results = r.solution_routine(subsets)
-
-    results = l.load_persistent_data()
-    #l.save_persistent_data(results)  # Saves time     
-
-    for pair in pairs:
-        pair_dataframe = results.loc[results["pair"] == pair]
-        pair_dataframe = r.remove_outliers_1(pair_dataframe)
-        print(r.get_coordinates(pair_dataframe))
-     
+    print(l.dataframe)   
 
 if __name__ == "__main__":
     main()
 
-    """ Tests
+    """Tests S1W2 residual buildup
+    l = Loader()
+    ls = LinSolver()
+
     i_vals = []
     residuals = []
     for i in range(10,700):
-        dataframe = l.get_linsolver_coef_raw_dataframe()[:i]
+        dataframe = l.get_linsolver_coef_raw_dataframe(l.dataframe)[:i]
         A = ls.parse_matrix_coef_from_data(dataframe)
         b = ls.parse_delays_vector_from_data(dataframe)
         i_vals.append(i)
@@ -384,7 +394,6 @@ if __name__ == "__main__":
     plt.ylabel("residual")
     plt.show()
     """
-
     """Test solving for a pair
     df = l.get_linsolver_coef_raw_dataframe(l.dataframe)  #TODO Test again for sure
     A = ls.parse_matrix_coef_from_data(df)
@@ -477,4 +486,36 @@ if __name__ == "__main__":
     results_s2s1 = results.loc[results["pair"] == "S1S2"]
     print(results_s2s1.loc[results_s2s1["data_number"] >= 4])
     """
+    
+    """
+    r = Routines()    
+    l = Loader("2012_all.csv")
 
+    pairs = l.get_telescope_pairs(l.dataframe)
+
+    #subsets = r.get_subset_constant_offset()
+    #results = r.solution_routine(subsets)
+
+    results = l.load_persistent_data()
+    #l.save_persistent_data(results)  # Saves time     
+
+    for pair in pairs:
+        pair_dataframe = results.loc[results["pair"] == pair]
+        pair_dataframe = r.remove_outliers_1(pair_dataframe)
+        print(r.get_coordinates(pair_dataframe))
+    """
+    """ Test 22 April filtered solutions
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+    r = Routines()
+
+    pairs = l.get_telescope_pairs(l.dataframe)    
+
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+
+    for pair in pairs:  
+        dataframe = results.loc[results["pair"] == pair]  # Select data
+        dataframe = r.remove_outliers_1(dataframe)
+        print(r.get_coordinates(dataframe))
+    """
