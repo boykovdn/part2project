@@ -172,24 +172,19 @@ class Routines:
         regression analysis is fitting data that corres-
         ponds to costant offsets as POP delay varies on day.
         """
-        #TODO Optimise? Change two for loops to a single one
         l = Loader("2012_all.csv")
         ls = LinSolver()
     
         pairs = l.get_telescope_pop_pairs(l.dataframe)
     
-        subsets = []
-        for pair in pairs:
-            subsets.append(l.dataframe.loc[[pair]])
-    
         subsubsets = []
-        for subset in subsets:
+        for pair in pairs:
+            subset = l.dataframe.loc[[pair]]
             unique_days = []
             for day in subset["day_number"]:
                 if day not in unique_days:
                     unique_days.append(day)
-            for day in unique_days: 
-                subsubsets.append(subset.loc[subset["day_number"] == day])
+                    subsubsets.append(subset.loc[subset["day_number"] == day])
     
         return subsubsets
 
@@ -214,6 +209,7 @@ class Routines:
         res = []
         pairs = []
         data_number = []
+        day_number = []
 
         subsets = self.filter_underconstrained(subsets)
 
@@ -228,10 +224,11 @@ class Routines:
             const.append(solution[0][3])
             res.append(solution[1])
             data_number.append(s.index.size)
+            day_number.append(s["day_number"].iloc[0])
     
-        results = pd.DataFrame({"pair": pairs,"x": xs,"y": ys,"z": zs,"offset": const,"residue": res, "data_number": data_number})
+        results = pd.DataFrame({"day_number": day_number, "pair": pairs,"x": xs,"y": ys,"z": zs,"offset": const,"residue": res, "data_number": data_number})
     
-        results = results[["pair","x","y","z","offset","residue","data_number"]]
+        results = results[["pair","x","y","z","offset","residue","data_number","day_number"]]
         results["baseline"] = np.sqrt(np.power(results["x"],2) + np.power(results["y"],2) + np.power(results["z"],2))
     
         return results
@@ -391,9 +388,62 @@ class Routines:
         results["baseline"] = np.sqrt(np.power(results["x"],2) + np.power(results["y"],2) + np.power(results["z"],2))
     
         return results
- 
+
+    def get_seizmic_avg_std(self):
+        l = Loader("2012_all.csv")
+        ls = LinSolver()
+        r = Routines()
+    
+        pairs = l.get_telescope_pairs(l.dataframe)    
+    
+        subsets = r.get_subset_constant_offset()
+        results = r.solution_routine(subsets)
+    
+        gradients = [] 
+        for pair in pairs:
+            results_pair = results.loc[results["pair"] == pair]
+            results_pair = r.remove_outliers_1(results_pair)
+            for coord in ["x","y","z"]:
+                coefs = np.polyfit(results_pair["day_number"], results_pair[coord], 1)
+                gradients.append(coefs[0]) 
+
+        results_pair = results.loc[results["pair"] == "E1W2"]
+        results_pair = r.remove_outliers_1(results_pair) 
+        
+        return np.average(gradients), np.std(gradients)
+    
 
 def main():
+
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+    r = Routines()
+
+    pairs = l.get_telescope_pairs(l.dataframe)    
+    print(r.get_seizmic_avg_std(), "test")
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+
+    results_pair = results.loc[results["pair"] == "E1W1"]
+    results_pair = r.remove_outliers_1(results_pair) 
+
+    plt.scatter(results_pair["day_number"], results_pair["x"])
+    coefs = np.polyfit(results_pair["day_number"], results_pair["x"], 1)
+    x_reg = np.arange(150)
+    y_reg = x_reg * coefs[0] + coefs[1]
+    plt.plot(x_reg, y_reg)
+    coefs[0] = np.round(coefs[0], 6)
+    coefs[1] = np.round(coefs[1],2)
+    plt.text(20,-300.39, str(coefs[0]) + "x" + " " + str(coefs[1]))
+    plt.xlabel("Observation day number (exact date unknown)")
+    plt.ylabel("x coordinate")
+    plt.show()
+ 
+
+if __name__ == "__main__":
+    main()
+
+    """ Final results
     l = Loader("2012_all.csv")
     ls = LinSolver()
     r = Routines()
@@ -403,15 +453,38 @@ def main():
     subsets = r.get_subset_constant_offset()
     results = r.solution_routine(subsets)
 
-    results_e1w1 = results.loc[results["pair"] == "E1W1"]
-    results_e1w1 = r.remove_outliers_1(results_e1w1)
-    print(results_e1w1)   
-
     
+    pairs_df = []
+    xs = [] 
+    ys = []
+    zs = []
+    xs_std = []
+    ys_std = []
+    zs_std = []
+    data_number = []
 
-if __name__ == "__main__":
-    main()
+    for pair in pairs:  
+        dataframe = results.loc[results["pair"] == pair]  # Select data
+        dataframe = r.remove_outliers_1(dataframe)
+        coords = r.get_coordinates(dataframe)
+        pairs_df.append(coords[0])
+        xs.append(coords[1])
+        ys.append(coords[2])
+        zs.append(coords[3])
+        xs_std.append(coords[4])
+        ys_std.append(coords[5])
+        zs_std.append(coords[6])
+        data_number.append(coords[7])
+ 
+    result = pd.DataFrame({"pairs":pairs_df, "x":xs, "y":ys, "z":zs, "x_std": xs_std, "y_std": ys_std, "z_std": zs_std, "data_number":data_number})    
+    result = result[["pairs","x","y","z","x_std","y_std","z_std","data_number"]]
+    result.round(decimals=2)
+    result.to_csv(path_or_buf = "final_results.csv", index=False)
+    
+    print(result)
 
+
+    """
     """Tests S1W2 residual buildup
     l = Loader()
     ls = LinSolver()
@@ -592,3 +665,28 @@ if __name__ == "__main__":
 #    plt.ylabel("residual")
 #    plt.show()
     """
+    """ Test seismic linear fit
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+    r = Routines()
+
+    pairs = l.get_telescope_pairs(l.dataframe)    
+
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+
+ 
+    for pair in pairs:
+        results_pair = results.loc[results["pair"] == pair]
+        results_pair = r.remove_outliers_1(results_pair)
+        for coord in ["x","y","z"]:
+            coefs = np.polyfit(results_pair["day_number"], results_pair[coord], 1)
+            print(coefs, pair, coord)
+
+    results_pair = results.loc[results["pair"] == "E1W2"]
+    results_pair = r.remove_outliers_1(results_pair) 
+
+    plt.scatter(results_pair["day_number"], results_pair["z"])
+    plt.show()
+    """
+
