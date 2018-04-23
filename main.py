@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+import time
 
 class Loader:
     def __init__(self, filename = "2012_S1W2.csv"):
@@ -46,7 +46,8 @@ class Loader:
         self.dataframe["day_number"] = days_array
 
     
-    def get_telescope_pop_pairs(self, dataframe):
+    @staticmethod
+    def get_telescope_pop_pairs(dataframe):
         """ INPUT: A dataframe indexed by telescope-pop identifiers
             OUTPUT: A list of the unique telescope-pop identifiers
 
@@ -57,7 +58,6 @@ class Loader:
             Not enhanced for performance because only serves a utility
             purpose.
         """
-        
         ids = []
 
         for name in dataframe.index:
@@ -160,7 +160,7 @@ class Routines:
     Wrapper class for the numerical routines and results.
     """
 
-    def get_subset_constant_offset(self):
+    def get_subset_constant_offset(self, dataframe):
         """
         Routine for grouping the raw data into subsets of
         constant delay offset
@@ -172,14 +172,11 @@ class Routines:
         regression analysis is fitting data that corres-
         ponds to costant offsets as POP delay varies on day.
         """
-        l = Loader("2012_all.csv")
-        ls = LinSolver()
-    
-        pairs = l.get_telescope_pop_pairs(l.dataframe)
+        pairs = Loader.get_telescope_pop_pairs(dataframe)
     
         subsubsets = []
         for pair in pairs:
-            subset = l.dataframe.loc[[pair]]
+            subset = dataframe.loc[[pair]]
             unique_days = []
             for day in subset["day_number"]:
                 if day not in unique_days:
@@ -188,7 +185,7 @@ class Routines:
     
         return subsubsets
 
-    def filter_underconstrained(self, subsets):
+    def filter_underconstrained(self, subsets): #  O(n) in subset number
                 
         results = []
         for s in subsets:
@@ -211,7 +208,7 @@ class Routines:
         data_number = []
         day_number = []
 
-        subsets = self.filter_underconstrained(subsets)
+        subsets = self.filter_underconstrained(subsets)  # O(n) in subset number
 
         for s in subsets:
             pairs.append((s.index)[0][2:-6])
@@ -415,30 +412,60 @@ class Routines:
 
 def main():
 
-    l = Loader("2012_all.csv")
-    ls = LinSolver()
-    r = Routines()
+    data_numbers = []
+    times = []
+    for i in np.linspace(10, 23000, 13):
 
-    pairs = l.get_telescope_pairs(l.dataframe)    
-    print(r.get_seizmic_avg_std(), "test")
-    subsets = r.get_subset_constant_offset()
-    results = r.solution_routine(subsets)
+        i = int(i)
+        t1 = time.time()
 
-    results_pair = results.loc[results["pair"] == "E1W1"]
-    results_pair = r.remove_outliers_1(results_pair) 
+        l = Loader("2012_all.csv")
+        l.dataframe = l.dataframe.iloc[:i]
+    
+        ls = LinSolver()
+        r = Routines()
+        pairs = l.get_telescope_pairs(l.dataframe)    
+    
+        subsets = r.get_subset_constant_offset(l.dataframe)
+        results = r.solution_routine(subsets)
+    
+        pairs_df = []
+        xs = [] 
+        ys = []
+        zs = []
+        xs_std = []
+        ys_std = []
+        zs_std = []
+        data_number = []
+       
+        for pair in pairs:  
+            dataframe = results.loc[results["pair"] == pair]  # Select data
+            dataframe = r.remove_outliers_1(dataframe)
+            coords = r.get_coordinates(dataframe)
+            pairs_df.append(coords[0])
+            xs.append(coords[1])
+            ys.append(coords[2])
+            zs.append(coords[3])
+            xs_std.append(coords[4])
+            ys_std.append(coords[5])
+            zs_std.append(coords[6])
+            data_number.append(coords[7])
+     
+        result = pd.DataFrame({"pairs":pairs_df, "x":xs, "y":ys, "z":zs, "x_std": xs_std, "y_std": ys_std, "z_std": zs_std, "data_number":data_number})    
+        result = result[["pairs","x","y","z","x_std","y_std","z_std","data_number"]]
+        result.round(decimals=2)
+       
+        t2 = time.time()
+    
+        data_numbers.append(i)
+        times.append(t2-t1)
 
-    plt.scatter(results_pair["day_number"], results_pair["x"])
-    coefs = np.polyfit(results_pair["day_number"], results_pair["x"], 1)
-    x_reg = np.arange(150)
-    y_reg = x_reg * coefs[0] + coefs[1]
-    plt.plot(x_reg, y_reg)
-    coefs[0] = np.round(coefs[0], 6)
-    coefs[1] = np.round(coefs[1],2)
-    plt.text(20,-300.39, str(coefs[0]) + "x" + " " + str(coefs[1]))
-    plt.xlabel("Observation day number (exact date unknown)")
-    plt.ylabel("x coordinate")
+    plt.scatter(data_numbers, times)
+    plt.xlabel("datapoints, total")
+    plt.ylabel("execution time / s")
+
     plt.show()
- 
+
 
 if __name__ == "__main__":
     main()
@@ -690,3 +717,29 @@ if __name__ == "__main__":
     plt.show()
     """
 
+    """
+    l = Loader("2012_all.csv")
+    ls = LinSolver()
+    r = Routines()
+
+    pairs = l.get_telescope_pairs(l.dataframe)    
+    print(r.get_seizmic_avg_std(), "test")
+    subsets = r.get_subset_constant_offset()
+    results = r.solution_routine(subsets)
+
+    results_pair = results.loc[results["pair"] == "E1W1"]
+    results_pair = r.remove_outliers_1(results_pair) 
+
+    plt.scatter(results_pair["day_number"], results_pair["x"])
+    coefs = np.polyfit(results_pair["day_number"], results_pair["x"], 1)
+    x_reg = np.arange(150)
+    y_reg = x_reg * coefs[0] + coefs[1]
+    plt.plot(x_reg, y_reg)
+    coefs[0] = np.round(coefs[0], 6)
+    coefs[1] = np.round(coefs[1],2)
+    plt.text(20,-300.39, str(coefs[0]) + "x" + " " + str(coefs[1]))
+    plt.xlabel("Observation day number (exact date unknown)")
+    plt.ylabel("x coordinate")
+    plt.show()
+ 
+    """
