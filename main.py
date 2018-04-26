@@ -412,6 +412,10 @@ class Routines:
 
 def main():
 
+if __name__ == "__main__":
+    main()
+
+    """ Test: timing execution
     data_numbers = []
     times = []
     for i in np.linspace(10, 23000, 13):
@@ -466,9 +470,8 @@ def main():
 
     plt.show()
 
+    """
 
-if __name__ == "__main__":
-    main()
 
     """ Final results
     l = Loader("2012_all.csv")
@@ -477,7 +480,7 @@ if __name__ == "__main__":
 
     pairs = l.get_telescope_pairs(l.dataframe)    
 
-    subsets = r.get_subset_constant_offset()
+    subsets = r.get_subset_constant_offset(l.dataframe)
     results = r.solution_routine(subsets)
 
     
@@ -531,12 +534,6 @@ if __name__ == "__main__":
     plt.ylabel("residual")
     plt.show()
     """
-    """Test solving for a pair
-    df = l.get_linsolver_coef_raw_dataframe(l.dataframe)  #TODO Test again for sure
-    A = ls.parse_matrix_coef_from_data(df)
-    b = ls.parse_delays_vector_from_data(df)
-    """ 
-
     """ Test show different POP settings can be fitted with same A
     l = Loader("2012_all.csv")
     ls = LinSolver()
@@ -555,7 +552,7 @@ if __name__ == "__main__":
     print(ls.solve_linear_system(A,b))
     """
 
-    """ Test 1: show different POP settings for S1W2
+    """ Test 1: show different POP settings for S1W2. There seems to be an outlier.
     l = Loader("2012_all.csv")
     ls = LinSolver()
 
@@ -580,7 +577,7 @@ if __name__ == "__main__":
     print(subset)
     """
 
-    """Test2
+    """Test2 Solve for specific days
     l = Loader("2012_all.csv")
     ls = LinSolver()
 
@@ -615,32 +612,6 @@ if __name__ == "__main__":
 
 
     """
-    """Test3
-    r = Routines()    
-
-    subsets = r.get_subset_constant_offset()
-    results = r.solution_routine(subsets)
-    results_s2s1 = results.loc[results["pair"] == "S1S2"]
-    print(results_s2s1.loc[results_s2s1["data_number"] >= 4])
-    """
-    
-    """
-    r = Routines()    
-    l = Loader("2012_all.csv")
-
-    pairs = l.get_telescope_pairs(l.dataframe)
-
-    #subsets = r.get_subset_constant_offset()
-    #results = r.solution_routine(subsets)
-
-    results = l.load_persistent_data()
-    #l.save_persistent_data(results)  # Saves time     
-
-    for pair in pairs:
-        pair_dataframe = results.loc[results["pair"] == pair]
-        pair_dataframe = r.remove_outliers_1(pair_dataframe)
-        print(r.get_coordinates(pair_dataframe))
-    """
     """ Test 22 April filtered solutions
     l = Loader("2012_all.csv")
     ls = LinSolver()
@@ -648,49 +619,13 @@ if __name__ == "__main__":
 
     pairs = l.get_telescope_pairs(l.dataframe)    
 
-    subsets = r.get_subset_constant_offset()
+    subsets = r.get_subset_constant_offset(l.dataframe)
     results = r.solution_routine(subsets)
 
     for pair in pairs:  
         dataframe = results.loc[results["pair"] == pair]  # Select data
         dataframe = r.remove_outliers_1(dataframe)
         print(r.get_coordinates(dataframe))
-    """
-    """ Test outliers in S1W2
-    l = Loader()
-    ls = LinSolver()
-
-    l.dataframe.reset_index(inplace=True)
-#    l.dataframe.to_csv(path_or_buf = "residual.csv"
-
-    outlier_day7 = l.dataframe.loc[l.dataframe["day_number"] == 7]
-    outlier_day17 = l.dataframe.loc[l.dataframe["day_number"] == 17]
-    
-    l.dataframe.drop(labels = outlier_day7.index, inplace=True)
-    l.dataframe.drop(labels = outlier_day17.index, inplace=True)
-
-#    i_vals = []
-#    residuals = []
-#    for i in range(10,700):
-#        dataframe = l.get_linsolver_coef_raw_dataframe(l.dataframe)[:i]
-#        A = ls.parse_matrix_coef_from_data(dataframe)
-#        b = ls.parse_delays_vector_from_data(dataframe)
-#        i_vals.append(i)
-#        residuals.append(ls.solve_linear_system(A,b)[1][0])
-    
-    A = ls.parse_matrix_coef_from_data(outlier_day7)
-    b = ls.parse_delays_vector_from_data(outlier_day7)
-    print(ls.solve_linear_system(A,b))
-
-    A = ls.parse_matrix_coef_from_data(outlier_day17)
-    b = ls.parse_delays_vector_from_data(outlier_day17)
-    print(ls.solve_linear_system(A,b))
-
-#    plt.plot(i_vals, residuals)
-#    plt.title("Residual vs data points used data[:x]")
-#    plt.xlabel("number of data points")
-#    plt.ylabel("residual")
-#    plt.show()
     """
     """ Test seismic linear fit
     l = Loader("2012_all.csv")
@@ -699,7 +634,7 @@ if __name__ == "__main__":
 
     pairs = l.get_telescope_pairs(l.dataframe)    
 
-    subsets = r.get_subset_constant_offset()
+    subsets = r.get_subset_constant_offset(l.dataframe)
     results = r.solution_routine(subsets)
 
  
@@ -742,4 +677,24 @@ if __name__ == "__main__":
     plt.ylabel("x coordinate")
     plt.show()
  
+    """
+    """
+    r = Routines()    
+    l = Loader("2012_all.csv")
+
+    pairs = l.get_telescope_pairs(l.dataframe)
+
+    # Save data first, then load to get faster performance on further tests
+    # This allows for a computationally heavy operation to be skipped
+
+    #subsets = r.get_subset_constant_offset(l.dataframe)
+    #results = r.solution_routine(subsets)
+
+    results = l.load_persistent_data()
+    #l.save_persistent_data(results)  # Saves time     
+
+    for pair in pairs:
+        pair_dataframe = results.loc[results["pair"] == pair]
+        pair_dataframe = r.remove_outliers_1(pair_dataframe)
+        print(r.get_coordinates(pair_dataframe))
     """
